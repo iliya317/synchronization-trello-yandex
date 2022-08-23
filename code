@@ -1,0 +1,121 @@
+import requests
+import json
+import pytz
+from datetime import datetime
+
+Key = '504123017cdd71072d0397ff27dd44a6'
+token = '9b6f80c17865dda45acaf980c444f323c2473ea5b2a555413af96a7ee63ca7fb'
+cards_info = {}
+
+def get_date_creation(id_card):
+    for i in range(len(id_card)):
+        id_card1 = id_card[i]['id']
+        creation_time = datetime.fromtimestamp(int(id_card1[0:8], 16))
+        print(creation_time)
+        #utc_creation_time = pytz.utc.localize(creation_time)
+        #print(utc_creation_time)
+
+def get_action(id_card):
+
+    for i in range(len(id_card)):
+        url = f"https://api.trello.com/1/cards/{id_card[i]['id']}/actions"
+
+        headers = {
+           "Accept": "application/json"
+        }
+
+        query = {
+           'key': Key,
+           'token': token
+        }
+
+        response = requests.request(
+           "GET",
+           url,
+           headers=headers,
+           params=query
+        )
+
+        string = json.loads(response.text)
+
+        if len(string) != 0:
+            for i in range(len(string)):
+                if string[i]['type'] == 'updateCard':
+                    print(f"{string[i]['data']['card']['id']}, {string[i]['data']['listAfter']}, {string[i]['data']['listBefore']}, {string[i]['date']}, {string[i]['memberCreator']['username']}")
+                elif string[i]['type'] == 'commentCard':
+                    print(f"{string[i]['data']['card']['id']}, {string[i]['data']['text']}, {string[i]['date']}, {string[i]['memberCreator']['username']},{string[i]['memberCreator']['fullName']}")
+                    pass
+        print(json.dumps(string,ensure_ascii=False, indent=4, sort_keys=True)) #f"{string['date']} ,{string['type']}"
+    return json.loads(response.text)
+
+def get_list_name():
+    pass
+
+def get_card_comment(card_Id):
+    url3 = (f'https://api.trello.com/1/cards/{card_Id}/actions?filter=commentCard&key={Key}&token={token}')
+    res = requests.get(url3)
+    string = json.loads((res.text))
+    for i in range(len(string)):
+        cards_info[card_Id]['comment'].append(string[i]['data']['text'])
+        #return string[i]['data']['text']
+
+
+def get_cards_id(board_name):
+    url = f"https://api.trello.com/1/members/me/boards?key={Key}&token={token}"
+    res = requests.get(url)
+    string = json.loads((res.text))
+
+    for i in range(len(string)):
+        if string[i]['name'] == board_name:
+            idBoard = string[i]['id']
+
+    url2 = f"https://api.trello.com/1/boards/{idBoard}/cards"
+
+    query = {
+       'key': Key,
+       'token': token,
+    }
+
+    response = requests.request(
+       "GET",
+       url2,
+       params=query
+    )
+
+    id_cards = json.loads((response.text))
+    return id_cards
+
+
+def write_date_in_dict(id_cards):
+    for i in range(len(id_cards)):
+
+        z = id_cards[i]['id']
+        cards_info.setdefault(z, {})
+
+        #cards_info[z].setdefault('list_name', [])
+        #cards_info[z]['list_name'].append()
+
+        cards_info[z].setdefault('comment', [])
+        get_card_comment(id_cards[i]['id'])
+
+        cards_info[z].setdefault('name', [])
+        cards_info[z]['name'].append((id_cards[i]['name']))
+
+        cards_info[z].setdefault('desc', id_cards[i]['desc'])
+
+        cards_info[z].setdefault('labels', [])
+        for j in range(len(id_cards[i]['labels'])):
+            cards_info[z]['labels'].append(id_cards[i]['labels'][j]['name'])
+
+        cards_info[z].setdefault('creation_date', [])
+        cards_info[z]['creation_date'].append(get_date_creation(id_cards))
+
+
+    return cards_info
+
+get_cards = get_cards_id('test_api')
+print(get_cards)
+print(get_cards[0]['id'])
+print(get_action(get_cards))
+
+##print(write_date_in_dict(get_cards)
