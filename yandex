@@ -1,0 +1,110 @@
+import requests
+import json
+import pytz
+from datetime import datetime
+import pandas as pd
+from yandex_tracker_client import TrackerClient
+#from trello import get_cards_id
+#from trello import get_lists_on_a_board
+
+OAUTH_token = 
+org_id = 
+
+
+
+
+
+def post_list():
+
+        #cards_id ,board_id = get_cards_id('Service Desk')
+        #df_lists, lists_json = get_lists_on_a_board(board_id)
+
+        url = "https://api.tracker.yandex.net/v2/boards/{}/columns/"
+
+        query = {
+                "yandexPassportOauthToken": 'OAuth ' + OAUTH_token,
+                "X-Org-ID": org_id
+                }
+
+        response = requests.request(
+                "POST",
+                url,
+                params=query
+            )
+        string = json.loads(response.text)
+
+def params_boards():
+
+        url = "https://api.tracker.yandex.net//v2/boards"
+
+        headers = {
+                'Authorization': 'OAuth ' + OAUTH_token,
+                'X-Org-ID': org_id
+        }
+
+        response = requests.request(
+                "GET",
+                url,
+                headers=headers
+        )
+        string = json.loads(response.text)
+
+        for i in range(len(string)):
+                if string[i] == 'test_api':
+                        board_version = string[i]['version']
+
+        url = "https://api.tracker.yandex.net//v2/boards"
+
+        headers = {
+                'Authorization': 'OAuth ' + OAUTH_token,
+                'X-Org-ID': org_id
+        }
+
+        response = requests.request(
+                "GET",
+                url,
+                headers=headers
+        )
+        string = json.loads(response.text)
+
+        for i in range(len(string)):
+                if string[i]['name'] == 'SECOND LINE':
+                        board_id = string[i]['id']
+                        board_version = string[i]['version']
+
+        url = f"https://api.tracker.yandex.net/v2/boards/{board_id}/columns"
+
+        headers = {
+                'Authorization': 'OAuth ' + OAUTH_token,
+                'X-Org-ID': org_id,
+                #'If - Match': f'{board_version}'
+        }
+
+        response = requests.request(
+                "GET",
+                url,
+                headers=headers
+        )
+        string = json.loads(response.text)
+
+        print(json.dumps(string,ensure_ascii=False, indent=4, sort_keys=True))
+
+
+
+
+params_boards()
+
+
+        response = requests.request(
+                "GET",
+                url,
+                headers=headers
+        )
+        string = json.loads(response.text)
+
+        print(json.dumps(string,ensure_ascii=False, indent=4, sort_keys=True))
+
+
+
+
+params_boards()
