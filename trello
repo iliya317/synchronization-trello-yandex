@@ -1,0 +1,438 @@
+import requests
+import json
+import pytz
+from datetime import datetime
+import pandas as pd
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_colwidth', None)
+
+
+
+Key = 
+token = 
+cards_info = {}
+movement_info = {}
+comment_info = {}
+attachment_info = {}
+members_info = {}
+lables_info = {}
+lists_on_a_board = {}
+
+def get_lists_on_a_board(board_id):
+    url = f"https://api.trello.com/1/boards/{board_id}/lists"
+
+    headers = {
+        "Accept": "application/json"
+    }
+
+    query = {
+        'key': Key,
+        'token': token
+    }
+
+    response = requests.request(
+        "GET",
+        url,
+        headers=headers,
+        params=query
+    )
+    string = json.loads(response.text)
+    print(json.loads(response.text))
+
+    for i in range(len(string)):
+        lists_on_a_board.setdefault('list_id', [])
+        lists_on_a_board['list_id'].append(string[i]['id'])
+
+        lists_on_a_board.setdefault('list_name', [])
+        lists_on_a_board['list_name'].append(string[i]['name'])
+
+    board_lists = pd.DataFrame(data=lists_on_a_board)
+    return board_lists, lists_on_a_board
+
+def user_members(board_id): # Получаем всех справочник пользователей на доске
+
+    url = f"https://api.trello.com/1/boards/{board_id}/members"
+
+    query = {
+        'key': Key,
+        'token': token,
+        'limit': 1000
+    }
+
+    response = requests.request(
+        "GET",
+        url,
+        params=query
+    )
+    string = json.loads(response.text)
+    print(len(string))
+    for i in range(len(string)):
+        members_info.setdefault('member_id', [])
+        members_info['member_id'].append(string[i]['id'])
+
+        members_info.setdefault('member_name', [])
+        members_info['member_name'].append(string[i]['fullName'])
+
+        members_info.setdefault('member_username', [])
+        members_info['member_username'].append(string[i]['username'])
+
+    df_members = pd.DataFrame(data = members_info)
+    return df_members
+
+
+def get_card_movement(board_id): ## действия ( переводы в другую колонку), комменты и прикрепленные файлы
+
+    url = f"https://api.trello.com/1/boards/{board_id}/actions"
+
+    query = {
+        'key': Key,
+        'token': token,
+        'limit': 1000,
+        'filter': 'updateCard'
+    }
+
+    response = requests.request(
+        "GET",
+        url,
+        params=query
+    )
+    string = json.loads(response.text)
+
+    print(len(string))
+    for i in range(len(string)):
+        #print(string[i])
+        if string[i]['type'] == 'updateCard':
+            try:
+                movement_info.setdefault('id_creator', [])
+                movement_info['id_creator'].append((string[i]['idMemberCreator']))
+
+                movement_info.setdefault('card_name', [])
+                movement_info['card_name'].append((string[i]['data']['card']['name']))
+
+                movement_info.setdefault('card_id', [])
+                movement_info['card_id'].append((string[i]['data']['card']['id']))
+
+                movement_info.setdefault('date_creation', [])
+                movement_info['date_creation'].append(get_date_creation(string[i]['data']['card']))
+
+                movement_info.setdefault('date_action', [])
+                movement_info['date_action'].append((string[i]['date']))
+
+                movement_info.setdefault('card_list_id', [])
+                movement_info['card_list_id'].append((string[i]['data']['card']['idList']))
+
+                movement_info.setdefault('card_list_name', [])
+                movement_info['card_list_name'].append((string[i]['data']['listAfter']['name']))
+
+                movement_info.setdefault('listbefore_id', [])
+                movement_info['listbefore_id'].append((string[i]['data']['listBefore']['id']))
+
+                movement_info.setdefault('listbefore_name', [])
+                movement_info['listbefore_name'].append((string[i]['data']['listBefore']['name']))
+
+                movement_info.setdefault('listafter_id', [])
+                movement_info['listafter_id'].append((string[i]['data']['listAfter']['id']))
+
+                movement_info.setdefault('listafter_name', [])
+                movement_info['listafter_name'].append((string[i]['data']['listAfter']['name']))
+
+
+            except KeyError:
+                movement_info.setdefault('card_list_id', [])
+                movement_info['card_list_id'].append((string[i]['data']['list']['id']))
+                try:
+                    movement_info.setdefault('card_list_name', [])
+                    movement_info['card_list_name'].append((string[i]['data']['list']['name']))
+                except:
+                    movement_info['card_list_name'].append(None)
+
+                movement_info.setdefault('listbefore_id', [])
+                movement_info['listbefore_id'].append((None))
+
+                movement_info.setdefault('listbefore_name', [])
+                movement_info['listbefore_name'].append((None))
+
+                movement_info.setdefault('listafter_id', [])
+                movement_info['listafter_id'].append(None)
+
+                movement_info.setdefault('listafter_name', [])
+                movement_info['listafter_name'].append(None)
+
+    df_movement = pd.DataFrame(movement_info).dropna()
+    return df_movement
+
+def get_comment(board_id):  ##комменты
+
+    url = f"https://api.trello.com/1/boards/{board_id}/actions"
+
+    query = {
+                'key': Key,
+                'token': token,
+                'limit': 1000,
+                'filter': 'commentCard'
+            }
+
+    response = requests.request(
+                "GET",
+                url,
+                params=query
+            )
+
+    string = json.loads(response.text)
+
+    for i in range(len(string)):
+            if string[i]['type'] == 'commentCard':
+                comment_info.setdefault('id_creator', [])
+                comment_info['id_creator'].append((string[i]['idMemberCreator']))
+
+                comment_info.setdefault('card_name', [])
+                comment_info['card_name'].append((string[i]['data']['card']['name']))
+
+                comment_info.setdefault('card_id', [])
+                comment_info['card_id'].append((string[i]['data']['card']['id']))
+
+
+                comment_info.setdefault('date_action', [])
+                comment_info['date_action'].append((string[i]['date']))
+
+                comment_info.setdefault('card_list_id', [])
+                comment_info['card_list_id'].append((string[i]['data']['list']['id']))
+
+                comment_info.setdefault('card_list_name', [])
+                comment_info['card_list_name'].append((string[i]['data']['list']['name']))
+
+                comment_info.setdefault('card_comments', [])
+                comment_info['card_comments'].append((string[i]['data']['text']))
+
+    df_comment = pd.DataFrame(data=comment_info)
+    return df_comment
+
+def get_card_attachment(board_id):  ## действия ( переводы в другую колонку), комменты и прикрепленные файлы
+
+        url = f"https://api.trello.com/1/boards/{board_id}/actions"
+
+        query = {
+                'key': Key,
+                'token': token,
+                'limit': 1000,
+                'filter': 'addAttachmentToCard'
+            }
+
+        response = requests.request(
+                "GET",
+                url,
+                params=query
+            )
+        string = json.loads(response.text)
+        for i in range(len(string)):
+
+            attachment_info.setdefault('date_action', [])
+            attachment_info.setdefault('id_creator', [])
+            attachment_info['id_creator'].append((string[i]['idMemberCreator']))
+
+            attachment_info.setdefault('card_name', [])
+            attachment_info['card_name'].append((string[i]['data']['card']['name']))
+
+            attachment_info.setdefault('card_id', [])
+            attachment_info['card_id'].append((string[i]['data']['card']['id']))
+
+            attachment_info.setdefault('date_action', [])
+            attachment_info['date_action'].append((string[i]['date']))
+            try:
+
+                attachment_info.setdefault('card_list_id', [])
+                attachment_info['card_list_id'].append((string[i]['data']['list']['id']))
+
+                attachment_info.setdefault('card_list_name', [])
+                attachment_info['card_list_name'].append((string[i]['data']['list']['name']))
+            except KeyError:
+                print(string[i])
+                attachment_info.setdefault('card_list_id', [])
+                attachment_info['card_list_id'].append((None))
+
+                attachment_info.setdefault('card_list_name', [])
+                attachment_info['card_list_name'].append((None))
+
+            attachment_info.setdefault('card_attachment_id', [])
+            attachment_info['card_attachment_id'].append((string[i]['data']['attachment']['id']))
+
+            attachment_info.setdefault('card_attachment_name', [])
+            attachment_info['card_attachment_name'].append((string[i]['data']['attachment']['name']))
+            try:
+                attachment_info.setdefault('card_attachment_url', [])
+                attachment_info['card_attachment_url'].append((string[i]['data']['attachment']['url']))
+            except KeyError:
+                attachment_info.setdefault('card_attachment_url', [])
+                attachment_info['card_attachment_url'].append((None))
+
+
+        df_attachment = pd.DataFrame(data=attachment_info)
+        return df_attachment
+
+
+def get_date_creation(id_card): ## Дата создания карточки
+
+        id_card1 = id_card['id']
+        creation_time = datetime.fromtimestamp(int(id_card1[0:8], 16))
+        return creation_time
+        #print(creation_time)
+        #utc_creation_time = pytz.utc.localize(creation_time)
+        #print(utc_creation_time)
+
+def get_action(id_card): ## Не использую
+
+    for i in range(len(id_card)):
+        url = f"https://api.trello.com/1/cards/{id_card[i]['id']}/actions"
+
+        headers = {
+           "Accept": "application/json"
+        }
+
+        query = {
+           'key': Key,
+           'token': token
+        }
+
+        response = requests.request(
+           "GET",
+           url,
+           headers=headers,
+           params=query
+        )
+
+        string = json.loads(response.text)
+
+        if len(string) != 0:
+            for i in range(len(string)):
+                if string[i]['type'] == 'updateCard':
+                    print(f"{string[i]['data']['card']['id']}, {string[i]['data']['listAfter']}, {string[i]['data']['listBefore']}, {string[i]['date']}, {string[i]['memberCreator']['username']}")
+                elif string[i]['type'] == 'commentCard':
+                    print(f"{string[i]['data']['card']['id']}, {string[i]['data']['text']}, {string[i]['date']}, {string[i]['memberCreator']['username']},{string[i]['memberCreator']['fullName']}")
+                    pass
+        print(json.dumps(string,ensure_ascii=False, indent=4, sort_keys=True)) #f"{string['date']} ,{string['type']}"
+    return json.loads(response.text)
+
+def get_list_name():
+    pass
+
+def get_card_comment(card_Id): ## Не использую
+    url3 = (f'https://api.trello.com/1/cards/{card_Id}/actions?filter=commentCard&key={Key}&token={token}')
+    res = requests.get(url3)
+    string = json.loads((res.text))
+    for i in range(len(string)):
+        cards_info[card_Id]['comment'].append(string[i]['data']['text'])
+        #return string[i]['data']['text']
+
+
+def get_cards_id(board_name):  ##Получаем id карт с помощью имени
+    url = f"https://api.trello.com/1/members/me/boards?key={Key}&token={token}"
+    res = requests.get(url)
+    string = json.loads((res.text))
+
+    for i in range(len(string)):
+        print(string[i]['name'])
+        if string[i]['name'] == board_name:
+            idBoard = string[i]['id']
+            break
+
+
+
+    url2 = f"https://api.trello.com/1/boards/{idBoard}/cards"
+
+    query = {
+       'key': Key,
+       'token': token,
+        'limit': 1000
+    }
+
+    response = requests.request(
+       "GET",
+       url2,
+       params=query
+    )
+
+    id_cards = json.loads((response.text))
+
+    return id_cards, idBoard
+
+def get_lables(id_cards):
+    for i in range(len(id_cards)):
+        lables_info.setdefault('id', [])
+
+        if len(id_cards[i]['labels']) != 0:
+            for j in range(len(id_cards[i]['labels'])):
+                lables_info['id'].append(id_cards[i]['id'])
+
+                lables_info.setdefault('label_id', [])
+                lables_info['label_id'].append(id_cards[i]['labels'][j]['id'])
+
+                lables_info.setdefault('label_name', [])
+                lables_info['label_name'].append(id_cards[i]['labels'][j]['name'])
+
+                lables_info.setdefault('label_color', [])
+                lables_info['label_color'].append(id_cards[i]['labels'][j]['color'])
+
+    df_lables = pd.DataFrame(data=lables_info)
+    print(lables_info)
+    return df_lables
+
+def card_table(id_cards):   ##основная таблица карт
+    for i in range(len(id_cards)):
+
+        z = id_cards[i]['id']
+        cards_info.setdefault('id', [])
+        cards_info['id'].append(z)
+
+        #cards_info[z].setdefault('list_name', [])
+        #cards_info[z]['list_name'].append()
+
+
+
+        cards_info.setdefault('name', [])
+        cards_info['name'].append((id_cards[i]['name']))
+
+        cards_info.setdefault('desc', [])
+        cards_info['desc'].append((id_cards[i]['desc']))
+
+        #cards_info[z].setdefault('labels', [])
+        #for j in range(len(id_cards[i]['labels'])):
+            #cards_info[z]['labels'].append(id_cards[i]['labels'][j]['name'])
+
+        cards_info.setdefault('creation_date', [])
+        cards_info['creation_date'].append(get_date_creation(id_cards[i]))
+
+        cards_info.setdefault('id_list', [])
+        cards_info['id_list'].append(id_cards[i]['idList'])
+
+        cards_info.setdefault('shortUrl', [])
+        cards_info['shortUrl'].append(id_cards[i]['shortUrl'])
+
+
+
+    df = pd.DataFrame(data=cards_info)
+    return df
+
+cards_id, board_id = get_cards_id('Service Desk')
+print(board_id)
+
+board_lists = get_lists_on_a_board(board_id)
+board_lists.to_excel('board_lists.xlsx')
+
+#board_id = cards_id[0]['board_id']
+
+#df_lables = get_lables(cards_id)
+#df_user_members = user_members(board_id)
+#df_user_members.to_excel('user_members.xlsx')
+#card_table = card_table(cards_id)
+#card_table.to_excel('cards_info.xlsx')
+#print(card_table(cards_id))
+#get_card_comment = get_comment(board_id)
+#get_card_comment.to_excel('get_card_comment.xlsx')
+#df = pd.DataFrame(data=cards_info)
+#print(df)
+#print(get_action(get_cards))
+
+##print(write_date_in_dict(get_cards))
+#cards_info[z].setdefault('comment', [])
+#get_card_comment(id_cards[i]['id'])
