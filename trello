@@ -1,7 +1,7 @@
 import requests
 import json
 import pytz
-from datetime import datetime
+import datetime as dt
 import pandas as pd
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -9,8 +9,8 @@ pd.set_option('display.max_colwidth', None)
 
 
 
-Key = 
-token = 
+Key = '504123017cdd71072d0397ff27dd44a6'
+token = '9b6f80c17865dda45acaf980c444f323c2473ea5b2a555413af96a7ee63ca7fb'
 cards_info = {}
 movement_info = {}
 comment_info = {}
@@ -90,6 +90,7 @@ def get_card_movement(board_id): ## действия ( переводы в др�
         'token': token,
         'limit': 1000,
         'filter': 'updateCard'
+
     }
 
     response = requests.request(
@@ -159,7 +160,88 @@ def get_card_movement(board_id): ## действия ( переводы в др�
                 movement_info.setdefault('listafter_name', [])
                 movement_info['listafter_name'].append(None)
 
-    df_movement = pd.DataFrame(movement_info).dropna()
+    while len(string) != 0:
+        print(movement_info['date_action'][-1])
+        url = f"https://api.trello.com/1/boards/{board_id}/actions"
+
+        query = {
+            'key': Key,
+            'token': token,
+            'limit': 1000,
+            'before': movement_info['date_action'][-1],
+            'filter': 'updateCard'
+
+        }
+
+        response = requests.request(
+            "GET",
+            url,
+            params=query
+        )
+        string = json.loads(response.text)
+        print(len(string))
+
+        for i in range(len(string)):
+            #print(string[i])
+            if string[i]['type'] == 'updateCard':
+                try:
+                    movement_info.setdefault('id_creator', [])
+                    movement_info['id_creator'].append((string[i]['idMemberCreator']))
+
+                    movement_info.setdefault('card_name', [])
+                    movement_info['card_name'].append((string[i]['data']['card']['name']))
+
+                    movement_info.setdefault('card_id', [])
+                    movement_info['card_id'].append((string[i]['data']['card']['id']))
+
+                    movement_info.setdefault('date_creation', [])
+                    movement_info['date_creation'].append(get_date_creation(string[i]['data']['card']))
+
+                    movement_info.setdefault('date_action', [])
+                    movement_info['date_action'].append((string[i]['date']))
+
+                    movement_info.setdefault('card_list_id', [])
+                    movement_info['card_list_id'].append((string[i]['data']['card']['idList']))
+
+                    movement_info.setdefault('card_list_name', [])
+                    movement_info['card_list_name'].append((string[i]['data']['listAfter']['name']))
+
+                    movement_info.setdefault('listbefore_id', [])
+                    movement_info['listbefore_id'].append((string[i]['data']['listBefore']['id']))
+
+                    movement_info.setdefault('listbefore_name', [])
+                    movement_info['listbefore_name'].append((string[i]['data']['listBefore']['name']))
+
+                    movement_info.setdefault('listafter_id', [])
+                    movement_info['listafter_id'].append((string[i]['data']['listAfter']['id']))
+
+                    movement_info.setdefault('listafter_name', [])
+                    movement_info['listafter_name'].append((string[i]['data']['listAfter']['name']))
+
+
+                except KeyError:
+                    movement_info.setdefault('card_list_id', [])
+                    movement_info['card_list_id'].append((string[i]['data']['list']['id']))
+                    try:
+                        movement_info.setdefault('card_list_name', [])
+                        movement_info['card_list_name'].append((string[i]['data']['list']['name']))
+                    except:
+                        movement_info['card_list_name'].append(None)
+
+                    movement_info.setdefault('listbefore_id', [])
+                    movement_info['listbefore_id'].append((None))
+
+                    movement_info.setdefault('listbefore_name', [])
+                    movement_info['listbefore_name'].append((None))
+
+                    movement_info.setdefault('listafter_id', [])
+                    movement_info['listafter_id'].append(None)
+
+                    movement_info.setdefault('listafter_name', [])
+                    movement_info['listafter_name'].append(None)
+
+
+    df_movement = pd.DataFrame(movement_info)
     return df_movement
 
 def get_comment(board_id):  ##комменты
@@ -274,7 +356,7 @@ def get_card_attachment(board_id):  ## действия ( переводы в д
 def get_date_creation(id_card): ## Дата создания карточки
 
         id_card1 = id_card['id']
-        creation_time = datetime.fromtimestamp(int(id_card1[0:8], 16))
+        creation_time = dt.date.fromtimestamp(int(id_card1[0:8], 16))
         return creation_time
         #print(creation_time)
         #utc_creation_time = pytz.utc.localize(creation_time)
@@ -325,7 +407,7 @@ def get_card_comment(card_Id): ## Не использую
         #return string[i]['data']['text']
 
 
-def get_cards_id(board_name):  ##Получаем id карт с помощью имени
+def get_cards_id(board_name):  ##Получаем id доски
     url = f"https://api.trello.com/1/members/me/boards?key={Key}&token={token}"
     res = requests.get(url)
     string = json.loads((res.text))
@@ -344,6 +426,7 @@ def get_cards_id(board_name):  ##Получаем id карт с помощью 
        'key': Key,
        'token': token,
         'limit': 1000
+
     }
 
     response = requests.request(
@@ -377,10 +460,29 @@ def get_lables(id_cards):
     print(lables_info)
     return df_lables
 
-def card_table(id_cards):   ##основная таблица карт
-    for i in range(len(id_cards)):
+def card_table(idBoard):   ##основная таблица карт. upd 03.09.22 нужно оптимизировать под листы, так как не могу скачать все карточки
 
-        z = id_cards[i]['id']
+    url2 = f"https://api.trello.com/1/boards/{idBoard}/cards"
+
+    query = {
+        'key': Key,
+        'token': token,
+        'limit': 1000
+
+    }
+
+    response = requests.request(
+        "GET",
+        url2,
+        params=query
+    )
+
+    string = json.loads((response.text))
+    print(json.dumps(string,ensure_ascii=False, indent=4, sort_keys=True))
+
+    for i in range(len(string)):
+
+        z = string[i]['id']
         cards_info.setdefault('id', [])
         cards_info['id'].append(z)
 
@@ -390,24 +492,30 @@ def card_table(id_cards):   ##основная таблица карт
 
 
         cards_info.setdefault('name', [])
-        cards_info['name'].append((id_cards[i]['name']))
+        cards_info['name'].append((string[i]['name']))
 
         cards_info.setdefault('desc', [])
-        cards_info['desc'].append((id_cards[i]['desc']))
+        cards_info['desc'].append((string[i]['desc']))
+        try:
+            cards_info.setdefault('dateLastActivity', [])
+            cards_info['dateLastActivity'].append((string[i]['dateLastActivity']))
+        except KeyError:
+
+            cards_info['dateLastActivity'].append(None)
+
 
         #cards_info[z].setdefault('labels', [])
         #for j in range(len(id_cards[i]['labels'])):
             #cards_info[z]['labels'].append(id_cards[i]['labels'][j]['name'])
 
         cards_info.setdefault('creation_date', [])
-        cards_info['creation_date'].append(get_date_creation(id_cards[i]))
+        cards_info['creation_date'].append(get_date_creation(string[i]))
 
         cards_info.setdefault('id_list', [])
-        cards_info['id_list'].append(id_cards[i]['idList'])
+        cards_info['id_list'].append(string[i]['idList'])
 
         cards_info.setdefault('shortUrl', [])
-        cards_info['shortUrl'].append(id_cards[i]['shortUrl'])
-
+        cards_info['shortUrl'].append(string[i]['shortUrl'])
 
 
     df = pd.DataFrame(data=cards_info)
@@ -416,8 +524,10 @@ def card_table(id_cards):   ##основная таблица карт
 cards_id, board_id = get_cards_id('Service Desk')
 print(board_id)
 
-board_lists = get_lists_on_a_board(board_id)
-board_lists.to_excel('board_lists.xlsx')
+
+df = card_table(board_id)
+df.to_excel('card.xlsx')
+
 
 #board_id = cards_id[0]['board_id']
 
