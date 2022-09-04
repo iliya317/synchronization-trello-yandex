@@ -9,8 +9,8 @@ pd.set_option('display.max_colwidth', None)
 
 
 
-Key = '504123017cdd71072d0397ff27dd44a6'
-token = '9b6f80c17865dda45acaf980c444f323c2473ea5b2a555413af96a7ee63ca7fb'
+Key = 
+token = 
 cards_info = {}
 movement_info = {}
 comment_info = {}
